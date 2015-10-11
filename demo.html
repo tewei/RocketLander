@@ -1,0 +1,74 @@
+<html>
+<head>
+    <script src="js/phaser.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css"> 
+    <style>
+        body {
+            padding-top: 50px;
+        }
+        .starter-template {
+            padding: 40px 15px;
+            text-align: center;
+        }
+        #panel{
+            width: 800px;
+            float: left;
+        }
+        .num{
+            float: left;
+            text-align: center;
+            font-size: 24px;
+            margin: 24px;
+            width: 60px;
+        }
+        canvas {
+            display : block;
+            margin : auto;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+        <div class="container">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="#">Rocket Lander</a>
+            </div>
+            <div id="navbar" class="collapse navbar-collapse">
+                <ul class="nav navbar-nav">
+                    <li class="active"><a href="#">Game</a></li>
+                    <li><a href="train.html">Train</a></li>
+                    <li><a href="test.html">Test</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="starter-template">
+            <h1>Game Demo</h1>
+            <h3>Velocity X and Y must be less than 30 to land safely.</h3>
+            <h3>Game over if the gas tank is empty.</h3>
+            <div class="row">
+                <h3><div class="col-md-3" id="score">0/0</div></h3>
+                <h3><div class="col-md-3" id="vx"></div></h3>
+                <h3><div class="col-md-3" id="vy"></div></h3>
+                <h3><div class="col-md-3" id="fuel"></div></h3>
+                <div class="col-md-3" id="vx"></div>
+                <div class="col-md-3" id="vy"></div>
+                <div class="col-md-3" id="fuel"></div>
+            </div>
+        
+            
+
+
+        </div>
+    </div>
+    <script src="js/game.js"></script>
+</body>
+</html>

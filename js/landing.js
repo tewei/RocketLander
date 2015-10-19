@@ -28,8 +28,7 @@ var episode = 0;
 var gamma = 0.9;
 var testFlag = false;
 var eps = 0.7;
-var FPS = 1;
-
+var FPS = 3;
 //end NN
 
 var GameState = function(game) {
@@ -50,12 +49,23 @@ GameState.prototype.create = function() {
     this.SCORE = 0;
     this.FUEL = 150;
     this.TIMER = 0;
-    this.ROTATION_SPEED = 180; // degrees/second
-    this.ACCELERATION = 60; // pixels/second/second
-    this.MAX_SPEED = 200; // pixels/second
+    this.ROTATION_SPEED = 10; // degrees/second
+    this.ACCELERATION = 100; // pixels/second/second
+    this.MAX_SPEED = 250; // pixels/second
     this.DRAG = 0; // pixels/second
     this.GRAVITY = 50; // pixels/second/second
 
+
+    //Landzone
+     this.landzone = this.game.add.group();    
+
+    for(var x = 0; x < this.game.width; x += 8){
+        var landzoneBlock = this.game.add.sprite(x, this.game.height-8, 'landzone');
+        this.game.physics.enable(landzoneBlock, Phaser.Physics.ARCADE);
+        landzoneBlock.body.immovable = true;
+        landzoneBlock.body.allowGravity = false;
+        this.landzone.add(landzoneBlock);
+    }
     //Ship
     this.ship = this.game.add.sprite(0, 0, 'ship');
     this.ship.anchor.setTo(0.5, 0.5);
@@ -75,6 +85,7 @@ GameState.prototype.create = function() {
         Phaser.Keyboard.UP,
         Phaser.Keyboard.DOWN
     ]);
+    
 };
 
 
@@ -105,12 +116,10 @@ GameState.prototype.getExplosion = function() {
 };
 
 GameState.prototype.getReward = function(){
-    var h, v, ax, ay;
-    h = Math.min(this.ship.x, this.game.width - this.ship.x);
-    v = Math.min(this.ship.y, this.game.height - this.ship.y);
-    ax = this.ship.body.acceleration.x;
-    ay = this.ship.body.acceleration.y;
-    return Math.log(Math.abs(Math.min(h, v))/400 + 0.001) + -2*Math.sin(this.ship.rotation);
+    var dist, 
+    dist = this.game.height - this.ship.y - 8;
+    
+    return Math.log(1/Math.abs(dist)) + -Math.sin(this.ship.rotation) + Math.log(1/Math.abs(this.ship.body.velocity.y));
 };
 
 GameState.prototype.getState = function(){
@@ -130,7 +139,7 @@ GameState.prototype.getState = function(){
 
 GameState.prototype.updateScore = function(flag) {
     this.PLAYED++;
-    if(flag) this.SCORE++;
+    if(flag == 2) this.SCORE++;
     document.getElementById("score").innerHTML = this.SCORE+'/'+this.PLAYED;
     document.getElementById("episode").innerHTML = ++episode;
 };
@@ -147,12 +156,13 @@ GameState.prototype.showVelocity = function() {
 
 GameState.prototype.resetScene = function() {
     // Move the ship back to the top of the stage
-    this.ship.x = 300 + Math.random()*200;
-    this.ship.y = 300 + Math.random()*200;
+    this.ship.x = 150 + Math.random()*200;
+    this.ship.y = 150 + Math.random()*200;
     this.ship.body.acceleration.setTo(0, 0);
 
     // Select a random starting angle and velocity
-    this.ship.angle = this.game.rnd.integerInRange(-180, 180);
+
+    this.ship.angle = this.game.rnd.integerInRange(-60, -120);
     this.ship.body.velocity.setTo(Math.random()*10 - 5, Math.random()*10 - 5);
     
     this.FUEL = 600;
@@ -160,23 +170,43 @@ GameState.prototype.resetScene = function() {
     lastState = this.getState();
 };
 
+GameState.prototype.checkLanding = function() {
+    if(this.ship.body.touching.down) {
+        if( Math.abs(this.ship.body.velocity.y) < 100
+            && Math.abs(this.ship.body.velocity.x) < 100
+            && Math.abs(Math.cos(this.ship.rotation)) < 0.2
+        ){
+            this.ship.body.angularVelocity = 0;
+            this.ship.body.velocity.setTo(0, 0);
+            this.ship.angle = -90;
+            endFlag = 2;
+            this.updateScore(endFlag);
+            this.resetScene();
+        }else{
+            this.getExplosion(this.ship.x, this.ship.y);
+            endFlag = 1;
+            this.updateScore(endFlag);
+            this.resetScene();
+        }
+    }
+}
+
 // The update() method is called every frame
 GameState.prototype.update = function() {
     
-    //Upd
     this.TIMER++;
     if(this.TIMER % FPS == 0){
-        lastReward = this.getReward();
+        thisReward = this.getReward();
     }
     this.showVelocity(this.ship.body.velocity.x, this.ship.body.velocity.y);
-    
+    // Collide the ship with the ground
+    this.game.physics.arcade.collide(this.ship, this.landzone, function(){
+        this.checkLanding();
+    }, null, this);
 
     //Game Over
-    if(this.ship.x > this.game.width || this.ship.x < 0 || this.ship.y > this.game.height || this.ship.y < 0){
+    if(this.ship.x > this.game.width || this.ship.x < 0 || this.ship.y > this.game.height || this.ship.y < 0 || this.FUEL <= 0){
         endFlag = 1;
-        this.updateScore(endFlag);
-    }else if(this.FUEL <= 0){
-        endFlag = 2;
         this.updateScore(endFlag);
     }
 
@@ -200,8 +230,14 @@ GameState.prototype.update = function() {
         this.ship.frame = 0;
     }
     
-    if(endFlag == 1) lastReward -= 10;
+    thisState = this.getState();
+    thisAction = -1;
+    max = -1e9;
 
+    approx = net.forward(thisState);
+    console.log(approx.w);
+    
+    
     if(this.TIMER % FPS == 0){
         thisState = this.getState();
         thisAction = -1;
@@ -221,12 +257,16 @@ GameState.prototype.update = function() {
             }
         }
 
-        if(!testFlag) trainSeq.push([lastState, lastAction, lastReward, thisState]);
+        if(!testFlag) trainSeq.push([lastState, lastAction, thisReward-lastReward, thisState]);
         lastState = thisState;
         lastAction = thisAction;
+        lastReward = thisReward;
     }
+
+    
     
     if(endFlag && !testFlag){
+
         while(trainSeq.length){
             var data = trainSeq.pop();
             var X = data[0];
@@ -241,12 +281,14 @@ GameState.prototype.update = function() {
             Y.w[data[1]] = data[2] + gamma*max;
             trainer.train(X, Y.w);
         }
+
     }
     if(endFlag){
         lastReward = 0;
         endFlag = 0;
         this.resetScene(); 
     }
+
 
 };
 
@@ -281,5 +323,5 @@ GameState.prototype.upInputIsActive = function() {
     return isActive;
 };
 
-var game = new Phaser.Game(800, 800, Phaser.AUTO, 'game');
+var game = new Phaser.Game(500, 500, Phaser.AUTO, 'game');
 game.state.add('game', GameState, true);

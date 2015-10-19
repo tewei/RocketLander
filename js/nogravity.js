@@ -3,7 +3,7 @@
 //Licensed under the terms of the MIT License
 
 //Define NN
-var NeuralNetwork = function(){};
+var NeuralNetwork= function(){};
 var layer_defs = [];
 
 layer_defs.push({type: 'input', out_sx:1, out_sy:1, out_depth: 10});
@@ -28,8 +28,6 @@ var episode = 0;
 var gamma = 0.9;
 var testFlag = false;
 var eps = 0.7;
-var FPS = 1;
-
 //end NN
 
 var GameState = function(game) {
@@ -51,10 +49,10 @@ GameState.prototype.create = function() {
     this.FUEL = 150;
     this.TIMER = 0;
     this.ROTATION_SPEED = 180; // degrees/second
-    this.ACCELERATION = 60; // pixels/second/second
-    this.MAX_SPEED = 200; // pixels/second
+    this.ACCELERATION = 200; // pixels/second/second
+    this.MAX_SPEED = 250; // pixels/second
     this.DRAG = 0; // pixels/second
-    this.GRAVITY = 50; // pixels/second/second
+    this.GRAVITY = 0; // pixels/second/second
 
     //Ship
     this.ship = this.game.add.sprite(0, 0, 'ship');
@@ -105,12 +103,11 @@ GameState.prototype.getExplosion = function() {
 };
 
 GameState.prototype.getReward = function(){
-    var h, v, ax, ay;
+    var h, v;
+
     h = Math.min(this.ship.x, this.game.width - this.ship.x);
     v = Math.min(this.ship.y, this.game.height - this.ship.y);
-    ax = this.ship.body.acceleration.x;
-    ay = this.ship.body.acceleration.y;
-    return Math.log(Math.abs(Math.min(h, v))/400 + 0.001) + -2*Math.sin(this.ship.rotation);
+    return Math.min(h, v)/200 -0.5;
 };
 
 GameState.prototype.getState = function(){
@@ -147,8 +144,8 @@ GameState.prototype.showVelocity = function() {
 
 GameState.prototype.resetScene = function() {
     // Move the ship back to the top of the stage
-    this.ship.x = 300 + Math.random()*200;
-    this.ship.y = 300 + Math.random()*200;
+    this.ship.x = 150 + Math.random()*200;
+    this.ship.y = 150 + Math.random()*200;
     this.ship.body.acceleration.setTo(0, 0);
 
     // Select a random starting angle and velocity
@@ -163,13 +160,11 @@ GameState.prototype.resetScene = function() {
 // The update() method is called every frame
 GameState.prototype.update = function() {
     
-    //Upd
-    this.TIMER++;
-    if(this.TIMER % FPS == 0){
-        lastReward = this.getReward();
-    }
+    // Collide the ship with the ground
+
+    lastReward = this.getReward();
     this.showVelocity(this.ship.body.velocity.x, this.ship.body.velocity.y);
-    
+    this.TIMER++;
 
     //Game Over
     if(this.ship.x > this.game.width || this.ship.x < 0 || this.ship.y > this.game.height || this.ship.y < 0){
@@ -200,33 +195,32 @@ GameState.prototype.update = function() {
         this.ship.frame = 0;
     }
     
-    if(endFlag == 1) lastReward -= 10;
+    thisState = this.getState();
+    thisAction = -1;
+    max = -1e9;
 
-    if(this.TIMER % FPS == 0){
-        thisState = this.getState();
-        thisAction = -1;
-        var max = -1e9;
-        approx = net.forward(thisState);
-        console.log(approx.w);
-        if(!testFlag && Math.random() > eps){
-            thisAction = Math.floor(Math.random()*6);
-            max = approx.w[thisAction];
-        }else{
-            //argmax
-            for(var a = 0; a < 6; ++a){
-                if(approx.w[a] > max){
-                    thisAction = a;
-                    max = approx.w[a];
-                }
+    approx = net.forward(thisState);
+    console.log(approx.w);
+    if(!testFlag && Math.random() > eps){
+        thisAction = Math.floor(Math.random()*6);
+        max = approx.w[thisAction];
+    }else{
+        //argmax
+        for(var a = 0; a < 6; ++a){
+            if(approx.w[a] > max){
+                thisAction = a;
+                max = approx.w[a];
             }
         }
-
-        if(!testFlag) trainSeq.push([lastState, lastAction, lastReward, thisState]);
-        lastState = thisState;
-        lastAction = thisAction;
     }
+
+    if(endFlag == 1) lastReward -= 10;
+    if(!testFlag) trainSeq.push([lastState, lastAction, lastReward, thisState]);
+    lastState = thisState;
+    lastAction = thisAction;
     
     if(endFlag && !testFlag){
+
         while(trainSeq.length){
             var data = trainSeq.pop();
             var X = data[0];
@@ -241,11 +235,9 @@ GameState.prototype.update = function() {
             Y.w[data[1]] = data[2] + gamma*max;
             trainer.train(X, Y.w);
         }
-    }
-    if(endFlag){
         lastReward = 0;
         endFlag = 0;
-        this.resetScene(); 
+        this.resetScene();      
     }
 
 };
@@ -281,5 +273,5 @@ GameState.prototype.upInputIsActive = function() {
     return isActive;
 };
 
-var game = new Phaser.Game(800, 800, Phaser.AUTO, 'game');
+var game = new Phaser.Game(500, 500, Phaser.AUTO, 'game');
 game.state.add('game', GameState, true);
